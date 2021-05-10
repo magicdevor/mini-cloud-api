@@ -2,21 +2,23 @@ package db
 
 import (
 	"database/sql"
-	_ "github.com/lib/pq"
 	"log"
 	"os"
 	"testing"
-)
 
-const (
-	dbDriver = "postgres"
-	dbSource = "postgresql://root:secret@localhost:5432/mini_db?sslmode=disable"
+	_ "github.com/lib/pq"
+	"xiebeitech.com/mini-cloud-api/util"
 )
 
 var testQueries *Queries
 
 func TestMain(m *testing.M) {
-	conn, err := sql.Open(dbDriver, dbSource)
+		config, err := util.NewConfig("../../.")
+	if err != nil {
+		log.Fatalln("cannot init config:", err)
+	}
+
+	conn, err := sql.Open(config.DBDriver, config.DBDataSource)
 	if err != nil {
 		log.Fatal("cannot connect database:", err)
 	}
