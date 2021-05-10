@@ -6,7 +6,7 @@ import (
 )
 
 type Server struct {
-	db *db.Queries
+	db     *db.Queries
 	router *gin.Engine
 }
 

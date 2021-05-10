@@ -13,7 +13,7 @@ import (
 var testQueries *Queries
 
 func TestMain(m *testing.M) {
-		config, err := util.NewConfig("../../.")
+	config, err := util.NewConfig("../../.")
 	if err != nil {
 		log.Fatalln("cannot init config:", err)
 	}
