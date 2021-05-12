@@ -6,6 +6,9 @@ type Config struct {
 	DBDriver      string `mapstructure:"DB_DRIVER"`
 	DBDataSource  string `mapstructure:"DB_DATA_SOURCE"`
 	ServerAddress string `mapstructure:"SERVER_ADDRESS"`
+
+	WXAppid  string `mapstructure:"WX_APPID"`
+	WXSecret string `mapstructure:"WX_SECRET"`
 }
 
 func NewConfig(path string) (config Config, err error) {
