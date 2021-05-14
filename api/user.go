@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	db "xiebeitech.com/mini-cloud-api/db/sqlc"
@@ -18,13 +19,15 @@ type LoginParams struct {
 	XWXUnionidFrom string `json:"X-WX-FROM-UNIONID"`
 	XWXSource      string `json:"X-WX-SOURCE"`
 
-	SelfWXOpenid     string `json:"self_wx_openid" binding:"required"`
-	SelfWXSessionKey string `json:"self_wx_session_key" binding:"required"`
+	SelfWXOpenid     string `json:"self_wx_openid"`
+	SelfWXSessionKey string `json:"self_wx_session_key"`
 }
 
 func (s *Server) Login(ctx *gin.Context) {
 	var params LoginParams
 	err := ctx.ShouldBindHeader(&params)
+	params.SelfWXOpenid = ctx.MustGet("self_wx_openid").(string)
+	params.SelfWXSessionKey = ctx.MustGet("self_wx_session_key").(string)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"status": http.StatusBadRequest, "message": err.Error()})
 		return
@@ -53,14 +56,23 @@ func (s *Server) Login(ctx *gin.Context) {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 			return
 		}
-		token := ""
+		token, err := s.maker.CreateToken(id, s.config.AccessTokenDuration)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			return
+		}
 		ctx.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "token": token, "message": "success"})
 		return
 	}
 }
 
 func LoginWithOpenData(s *Server, ctx *gin.Context, args LoginParams) (token string, err error) {
+	id, err := s.snowflake.NextID()
+	if err != nil {
+		return
+	}
 	carg := db.CreateUserParams{
+		ID:          strconv.FormatInt(id, 16),
 		Appid:       args.XWXAppid,
 		Unionid:     args.XWXUnionid,
 		Openid:      args.SelfWXOpenid,
@@ -74,8 +86,6 @@ func LoginWithOpenData(s *Server, ctx *gin.Context, args LoginParams) (token str
 	if err != nil {
 		return
 	}
-	id := u.ID
-	print(id)
-	// generate token
-	return "", nil
+	token, err = s.maker.CreateToken(u.ID, s.config.AccessTokenDuration)
+	return token, err
 }

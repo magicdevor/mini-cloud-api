@@ -11,7 +11,7 @@ import (
 )
 
 type AuthCode struct {
-	Code string `json:"code"`
+	Code string `form:"code" binding:"required"`
 }
 
 func AuthenticateMiddleware(config util.Config) gin.HandlerFunc {
@@ -19,7 +19,7 @@ func AuthenticateMiddleware(config util.Config) gin.HandlerFunc {
 		var code AuthCode
 		err := ctx.ShouldBindQuery(&code)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"status": http.StatusBadRequest, "message": "code must be provided"})
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"status": http.StatusBadRequest, "message": "code must be provided", "err": err.Error()})
 			return
 		}
 
@@ -30,7 +30,7 @@ func AuthenticateMiddleware(config util.Config) gin.HandlerFunc {
 		}
 
 		if r.ErrCode != 0 {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"status": r.ErrCode, "message": err.Error()})
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"status": r.ErrCode, "message": r.ErrMsg})
 			return
 		}
 
@@ -52,7 +52,7 @@ type Code2SessionResult struct {
 }
 
 func Code2Session(code string, config util.Config) (r Code2SessionResult, err error) {
-	var params url.Values
+	params := url.Values{}
 	params.Set("appid", config.WXAppid)
 	params.Set("secret", config.WXSecret)
 	params.Set("js_code", code)
