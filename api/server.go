@@ -30,6 +30,11 @@ func NewServer(db *db.Queries, cf util.Config) (server *Server, err error) {
 	server.maker = tokenMaker
 
 	router := gin.Default()
+	v2 := router.Group("/v2", JWTAuthenticateMiddleware(tokenMaker))
+	{
+		v2.GET("/profile", server.GetProfile)
+		v2.POST("/profile", server.CreateProfile)
+	}
 	router.GET("/login", AuthenticateMiddleware(server.config), server.Login)
 	server.router = router
 

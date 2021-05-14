@@ -2,11 +2,15 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"xiebeitech.com/mini-cloud-api/token"
 	"xiebeitech.com/mini-cloud-api/util"
 )
 
@@ -76,4 +80,44 @@ func Code2Session(code string, config util.Config) (r Code2SessionResult, err er
 
 	err = json.Unmarshal(b, &r)
 	return
+}
+
+const (
+	authorizationHeaderKey  = "Authorization"
+	authorizationTypeBearer = "bearer"
+	authorizationKey        = "authorization_payload"
+)
+
+func JWTAuthenticateMiddleware(maker token.Maker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authorizationHeader := c.GetHeader(authorizationHeaderKey)
+		if len(authorizationHeader) == 0 {
+			err := errors.New("authorization header is not provided")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+
+		fields := strings.Fields(authorizationHeader)
+		if len(fields) < 2 {
+			err := errors.New("invalid authorization header format")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+
+		authorizationType := strings.ToLower(fields[0])
+		if authorizationType != authorizationTypeBearer {
+			err := fmt.Errorf("unsupported authorization type %s", authorizationType)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err})
+			return
+		}
+
+		accessToken := fields[1]
+		payload, err := maker.VerifyToken(accessToken)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+		c.Set(authorizationKey, payload)
+		c.Next()
+	}
 }
