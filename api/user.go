@@ -34,12 +34,48 @@ func (s *Server) Login(ctx *gin.Context) {
 		Appid:  params.XWXAppid,
 		Openid: params.SelfWXOpenid,
 	}
-	id, err := s.db.GetUserIDByAppidAndOpenid(ctx, arg)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"status": http.StatusInternalServerError, "message": err.Error()})
+	
+	if id, err := s.db.GetUserIDByAppidAndOpenid(ctx, arg); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			token, err := LoginWithOpenData(s, ctx, params); 
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+				return
+			}
+			ctx.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "token": token, "message": "success"})
+			return
+		}
+		arg := db.UpdateUserParams{
+			ID: id,
+			SessionKey: params.SelfWXSessionKey,
+		}
+		if err = s.db.UpdateUser(ctx, arg); err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+			return
+		}
+		token := ""
+		ctx.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "token": token, "message": "success"})
 		return
 	}
+}
 
-	carg := db.CreateUserParams{ID: id}
-	s.db.CreateUser(ctx, carg)
+func LoginWithOpenData(s *Server, ctx *gin.Context, args LoginParams) (token string, err error) {
+	carg := db.CreateUserParams{
+		Appid: args.XWXAppid,
+		Unionid: args.XWXUnionid,
+		Openid: args.SelfWXOpenid,
+		SessionKey: args.SelfWXOpenid,
+		AppidFrom: args.XWXAppidFrom,
+		OpenidFrom: args.XWXOpenidFrom,
+		UnionidFrom: args.XWXUnionidFrom,
+	}
+	u, err := s.db.CreateUser(ctx, carg)
+
+	if err != nil {
+		return
+	}
+	id := u.ID
+	print(id)
+	// generate token
+	return "", nil
 }
