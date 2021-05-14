@@ -34,10 +34,10 @@ func (s *Server) Login(ctx *gin.Context) {
 		Appid:  params.XWXAppid,
 		Openid: params.SelfWXOpenid,
 	}
-	
+
 	if id, err := s.db.GetUserIDByAppidAndOpenid(ctx, arg); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			token, err := LoginWithOpenData(s, ctx, params); 
+			token, err := LoginWithOpenData(s, ctx, params)
 			if err != nil {
 				ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 				return
@@ -46,7 +46,7 @@ func (s *Server) Login(ctx *gin.Context) {
 			return
 		}
 		arg := db.UpdateUserParams{
-			ID: id,
+			ID:         id,
 			SessionKey: params.SelfWXSessionKey,
 		}
 		if err = s.db.UpdateUser(ctx, arg); err != nil {
@@ -61,12 +61,12 @@ func (s *Server) Login(ctx *gin.Context) {
 
 func LoginWithOpenData(s *Server, ctx *gin.Context, args LoginParams) (token string, err error) {
 	carg := db.CreateUserParams{
-		Appid: args.XWXAppid,
-		Unionid: args.XWXUnionid,
-		Openid: args.SelfWXOpenid,
-		SessionKey: args.SelfWXOpenid,
-		AppidFrom: args.XWXAppidFrom,
-		OpenidFrom: args.XWXOpenidFrom,
+		Appid:       args.XWXAppid,
+		Unionid:     args.XWXUnionid,
+		Openid:      args.SelfWXOpenid,
+		SessionKey:  args.SelfWXOpenid,
+		AppidFrom:   args.XWXAppidFrom,
+		OpenidFrom:  args.XWXOpenidFrom,
 		UnionidFrom: args.XWXUnionidFrom,
 	}
 	u, err := s.db.CreateUser(ctx, carg)
