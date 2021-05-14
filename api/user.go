@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -34,11 +35,12 @@ func (s *Server) Login(ctx *gin.Context) {
 	}
 
 	arg := db.GetUserIDByAppidAndOpenidParams{
-		Appid:  params.XWXAppid,
+		Appid:  GetString(params.XWXAppid, s.config.WXAppid),
 		Openid: params.SelfWXOpenid,
 	}
 
-	if id, err := s.db.GetUserIDByAppidAndOpenid(ctx, arg); err != nil {
+	id, err := s.db.GetUserIDByAppidAndOpenid(ctx, arg)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			token, err := LoginWithOpenData(s, ctx, params)
 			if err != nil {
@@ -48,22 +50,25 @@ func (s *Server) Login(ctx *gin.Context) {
 			ctx.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "token": token, "message": "success"})
 			return
 		}
-		arg := db.UpdateUserParams{
-			ID:         id,
-			SessionKey: params.SelfWXSessionKey,
-		}
-		if err = s.db.UpdateUser(ctx, arg); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			return
-		}
-		token, err := s.maker.CreateToken(id, s.config.AccessTokenDuration)
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			return
-		}
-		ctx.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "token": token, "message": "success"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
+
+	uarg := db.UpdateUserParams{
+		ID:         id,
+		SessionKey: params.SelfWXSessionKey,
+	}
+	if err = s.db.UpdateUser(ctx, uarg); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+
+	token, err := s.maker.CreateToken(id, s.config.AccessTokenDuration)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "token": token, "message": "success"})
 }
 
 func LoginWithOpenData(s *Server, ctx *gin.Context, args LoginParams) (token string, err error) {
@@ -73,14 +78,15 @@ func LoginWithOpenData(s *Server, ctx *gin.Context, args LoginParams) (token str
 	}
 	carg := db.CreateUserParams{
 		ID:          strconv.FormatInt(id, 16),
-		Appid:       args.XWXAppid,
-		Unionid:     args.XWXUnionid,
+		Unionid:     GetString(args.XWXUnionid, "unionid"),
+		Appid:       GetString(args.XWXAppid, s.config.WXAppid),
 		Openid:      args.SelfWXOpenid,
-		SessionKey:  args.SelfWXOpenid,
-		AppidFrom:   args.XWXAppidFrom,
-		OpenidFrom:  args.XWXOpenidFrom,
-		UnionidFrom: args.XWXUnionidFrom,
+		SessionKey:  args.SelfWXSessionKey,
+		AppidFrom:   GetString(args.XWXAppidFrom, s.config.WXAppid),
+		UnionidFrom: GetString(args.XWXUnionidFrom, "unionid"),
+		OpenidFrom:  GetString(args.XWXOpenidFrom, args.SelfWXOpenid),
 	}
+	log.Printf("appid: %s", carg.Appid)
 	u, err := s.db.CreateUser(ctx, carg)
 
 	if err != nil {
@@ -88,4 +94,11 @@ func LoginWithOpenData(s *Server, ctx *gin.Context, args LoginParams) (token str
 	}
 	token, err = s.maker.CreateToken(u.ID, s.config.AccessTokenDuration)
 	return token, err
+}
+
+func GetString(origin, target string) string {
+	if origin != "" {
+		return origin
+	}
+	return target
 }
